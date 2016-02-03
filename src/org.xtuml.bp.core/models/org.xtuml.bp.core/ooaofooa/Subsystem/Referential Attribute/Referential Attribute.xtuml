@@ -130,46 +130,28 @@ for each other_ref in other_ref_set
   relate other_ref to ref across R112.''succeeds'';
   ref = other_ref;    
 end for;
+
 select any oida related by other_attr->O_OIDA[R105];
 if ( not_empty oida )  // attribute is identifying
   select many other_oidas related by other_attr->O_OIDA[R105];
   select one attr related by self->O_ATTR[R106];
   select many this_oidas related by attr->O_OIDA[R105];
-  has_overlap = false;
-  is_refered_to_in_overlap = false;
   for each other_oida in other_oidas
+    skip = false;
     for each this_oida in this_oidas
-      if (this_oida.Oid_ID == other_oida.Oid_ID)
-        has_overlap = true;
-        select any ref_to_other related by other_oida->O_RTIDA[R110];
-        is_refered_to_in_overlap = is_refered_to_in_overlap or (not_empty ref_to_other);
-      end if;
+      skip = (this_oida.Oid_ID == other_oida.Oid_ID);
     end for;
+    if (skip)
+      other_oida.dispose();
+    else
+      select one id related by other_oida->O_ID[R105];
+      unrelate other_attr from id across R105 using other_oida;
+      relate attr to id across R105 using other_oida;
+    end if;
   end for;
-  if (has_overlap and is_refered_to_in_overlap)
-    // both attributes are part of the same identifier,
-    // and there are external references.
-    // too tricky to handle
-    other_rattr.migrateToBase();
-  else
-    for each other_oida in other_oidas
-      skip = false;
-      for each this_oida in this_oidas
-        skip = (this_oida.Oid_ID == other_oida.Oid_ID);
-      end for;
-      if (skip)
-        other_oida.dispose();
-      else
-        select one id related by other_oida->O_ID[R105];
-        unrelate other_attr from id across R105 using other_oida;
-        relate attr to id across R105 using other_oida;
-      end if;
-    end for;
-    other_attr.dispose();
-  end if;
-else
-  other_attr.dispose();
-end if;',
+end if;
+
+other_attr.dispose();',
 	1,
 	'',
 	"02ec5b84-0de6-4c57-923c-1a1986a821a5");
