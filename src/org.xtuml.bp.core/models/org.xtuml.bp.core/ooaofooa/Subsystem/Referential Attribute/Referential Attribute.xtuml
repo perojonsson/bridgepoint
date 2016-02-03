@@ -113,29 +113,63 @@ INSERT INTO O_TFR
 select one other_rattr related by other_attr->O_RATTR[R106];
 select many other_ref_set related by other_rattr->O_REF[R108];
    
-   // find last O_REF in self''s ref list R112
-   select any ref related by self->O_REF[R108];
-   select one next_ref related by ref->O_REF[R112.''precedes''];
-   while (not_empty next_ref)
-     select one next_ref related by ref->O_REF[R112.''precedes''];
-     if (not_empty next_ref)
-       ref = next_ref;
-     end if;
-   end while;
+// find last O_REF in self''s ref list R112
+select any ref related by self->O_REF[R108];
+select one next_ref related by ref->O_REF[R112.''precedes''];
+while (not_empty next_ref)
+  select one next_ref related by ref->O_REF[R112.''precedes''];
+  if (not_empty next_ref)
+    ref = next_ref;
+  end if;
+end while;
    
-   for each other_ref in other_ref_set
-     unrelate other_ref from other_rattr across R108;
-     relate other_ref to self across R108;  
-     // add other_ref to self''s ref list R112
-     relate other_ref to ref across R112.''succeeds'';
-     ref = other_ref;    
-   end for;
-   select any oida related by other_attr->O_OIDA[R105];
-   if ( not_empty oida )  // attribute is identifying
-     other_rattr.migrateToBase();
-   else
-     other_attr.dispose();
-   end if;',
+for each other_ref in other_ref_set
+  unrelate other_ref from other_rattr across R108;
+  relate other_ref to self across R108;  
+  // add other_ref to self''s ref list R112
+  relate other_ref to ref across R112.''succeeds'';
+  ref = other_ref;    
+end for;
+select any oida related by other_attr->O_OIDA[R105];
+if ( not_empty oida )  // attribute is identifying
+  select many other_oidas related by other_attr->O_OIDA[R105];
+  select one attr related by self->O_ATTR[R106];
+  select many this_oidas related by attr->O_OIDA[R105];
+  has_overlap = false;
+  is_refered_to_in_overlap = false;
+  for each other_oida in other_oidas
+    for each this_oida in this_oidas
+      if (this_oida.Oid_ID == other_oida.Oid_ID)
+        has_overlap = true;
+        select any ref_to_other related by other_oida->O_RTIDA[R110];
+        is_refered_to_in_overlap = is_refered_to_in_overlap or (not_empty ref_to_other);
+      end if;
+    end for;
+  end for;
+  if (has_overlap and is_refered_to_in_overlap)
+    // both attributes are part of the same identifier,
+    // and there are external references.
+    // too tricky to handle
+    other_rattr.migrateToBase();
+  else
+    for each other_oida in other_oidas
+      skip = false;
+      for each this_oida in this_oidas
+        skip = (this_oida.Oid_ID == other_oida.Oid_ID);
+      end for;
+      if (skip)
+        other_oida.dispose();
+      else
+        select one id related by other_oida->O_ID[R105];
+        unrelate other_attr from id across R105 using other_oida;
+        relate attr to id across R105 using other_oida;
+      end if;
+    end for;
+    other_attr.dispose();
+  end if;
+else
+  other_attr.dispose();
+end if;',
 	1,
 	'',
 	"02ec5b84-0de6-4c57-923c-1a1986a821a5");
